@@ -33,7 +33,17 @@ func sample(key models.FlowKey, bytes uint64, domain, app string) models.Sample 
 	}
 }
 
+// freshKey — второй поток с другим клиентским портом.
+func freshKey() models.FlowKey {
+	return models.FlowKey{
+		A:     models.Endpoint{IP: netip.MustParseAddr("192.0.2.10"), Port: 51001},
+		B:     models.Endpoint{IP: netip.MustParseAddr("198.51.100.20"), Port: 443},
+		Proto: "tcp",
+	}
+}
+
 // newTestStore создаёт хранилище на управляемых часах.
+// Часы читают *now при каждом вызове, поэтому сдвиг fixed виден Store сразу.
 func newTestStore(cfg config.Config, now *time.Time) *Store {
 	return New(cfg, nil, WithClock(func() time.Time { return *now }))
 }
@@ -67,20 +77,45 @@ func TestAggregatesFlow(t *testing.T) {
 
 func TestPruneForgetsOldFlow(t *testing.T) {
 	cfg := config.Default()
-	t0 := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
+	// База в будущем: если Store возьмёт time.Now() вместо внедрённых часов,
+	// проверка «на половине TTL поток жив» упадёт.
+	t0 := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixed := t0
 	st := newTestStore(cfg, &fixed)
 
-	st.Ingest(sample(testKey(), 100, "example.com", "tls"))
+	old := testKey()
+	st.Ingest(sample(old, 100, "", "tls"))
 	if got := st.Snapshot(10, "test").FlowsTotal; got != 1 {
-		t.Fatalf("до Prune: FlowsTotal = %d, want 1", got)
+		t.Fatalf("после Ingest: FlowsTotal = %d, want 1", got)
 	}
 
+	// Половина TTL — поток ещё жив.
+	fixed = t0.Add(cfg.FlowTTL / 2)
+	st.Prune()
+	if got := st.Snapshot(10, "test").FlowsTotal; got != 1 {
+		t.Fatalf("Prune на половине TTL: FlowsTotal = %d, want 1", got)
+	}
+
+	// Свежий поток появляется уже после сдвига часов.
+	fresh := freshKey()
+	st.Ingest(sample(fresh, 200, "", "http"))
+	if got := st.Snapshot(10, "test").FlowsTotal; got != 2 {
+		t.Fatalf("после второго Ingest: FlowsTotal = %d, want 2", got)
+	}
+
+	// Прыжок за TTL: старый поток протухает, свежий обязан выжить.
 	fixed = t0.Add(cfg.FlowTTL + time.Minute)
 	st.Prune()
 
-	if got := st.Snapshot(10, "test").FlowsTotal; got != 0 {
-		t.Fatalf("после Prune: FlowsTotal = %d, want 0", got)
+	snap := st.Snapshot(10, "test")
+	if snap.FlowsTotal != 1 {
+		t.Fatalf("после Prune за TTL: FlowsTotal = %d, want 1", snap.FlowsTotal)
+	}
+	if len(snap.TopFlows) != 1 || snap.TopFlows[0].Key != fresh {
+		t.Fatalf("после Prune остался %v, want %v", snap.TopFlows, fresh)
+	}
+	if snap.TotalBytes != 300 {
+		t.Fatalf("TotalBytes = %d, want 300 (Prune не трогает общие счётчики)", snap.TotalBytes)
 	}
 }
 

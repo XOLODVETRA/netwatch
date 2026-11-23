@@ -5,29 +5,65 @@ import (
 	"testing"
 )
 
-// clientHello собирает минимальный корректный TLS ClientHello с заданным SNI.
-func clientHello(sni string) []byte {
-	return clientHelloWithSNI(sni, true)
+// helloOptions управляет тем, какие расширения попадут в ClientHello.
+type helloOptions struct {
+	serverName bool // добавить расширение server_name (тип 0)
+	decoyFirst bool // поставить постороннее расширение перед server_name
 }
 
-// clientHelloWithSNI собирает минимальный ClientHello.
-// При withServerName = false расширение server_name не добавляется,
-// вместо него кладётся безобидное supported_versions.
-func clientHelloWithSNI(sni string, withServerName bool) []byte {
-	name := []byte(sni)
+// clientHello собирает минимальный корректный TLS ClientHello с заданным SNI.
+func clientHello(sni string) []byte {
+	return clientHelloOpts(sni, helloOptions{serverName: true})
+}
 
+// decoyExtension возвращает постороннее расширение с «имя-подобным» телом:
+// список из одной записи (host_name, длина 3, "foo").
+//
+// Тело намеренно длиннее 5 байт и структурно совпадает с server_name, чтобы
+// тест на отсутствие SNI был опровержимым: если убрать проверку типа расширения,
+// extractSNI разберёт "foo" вместо того, чтобы пропустить расширение.
+func decoyExtension() []byte {
+	name := []byte("foo")
+	bodyLen := 5 + len(name) // list_len(2) + name_type(1) + name_len(2) + имя
+
+	ext := make([]byte, 0, 4+bodyLen)
+	ext = append(ext, 0x00, 0x2b) // extension_type = supported_versions (не 0)
+	ext = append(ext, byte(bodyLen>>8), byte(bodyLen))
+	listLen := 3 + len(name)
+	ext = append(ext, byte(listLen>>8), byte(listLen))
+	ext = append(ext, 0x00) // name_type = host_name
+	ext = append(ext, byte(len(name)>>8), byte(len(name)))
+	ext = append(ext, name...)
+	return ext
+}
+
+// serverNameExtension собирает расширение server_name (тип 0) для sni.
+func serverNameExtension(sni string) []byte {
+	name := []byte(sni)
+	bodyLen := 5 + len(name) // list_len(2) + name_type(1) + name_len(2) + имя
+
+	ext := make([]byte, 0, 4+bodyLen)
+	ext = append(ext, 0x00, 0x00) // extension_type = server_name
+	ext = append(ext, byte(bodyLen>>8), byte(bodyLen))
+	listLen := 3 + len(name)
+	ext = append(ext, byte(listLen>>8), byte(listLen))
+	ext = append(ext, 0x00) // name_type = host_name
+	ext = append(ext, byte(len(name)>>8), byte(len(name)))
+	ext = append(ext, name...)
+	return ext
+}
+
+// clientHelloOpts собирает минимальный корректный ClientHello:
+// record 0x16/0x0301, handshake 0x01, version 0x0303, 32 байта random,
+// session id 0, один cipher suite, compression 0 и список расширений.
+func clientHelloOpts(sni string, opt helloOptions) []byte {
 	var exts []byte
-	if withServerName {
-		exts = append(exts, 0x00, 0x00) // extension_type = server_name
-		extLen := 5 + len(name)
-		exts = append(exts, byte(extLen>>8), byte(extLen))
-		listLen := 3 + len(name)
-		exts = append(exts, byte(listLen>>8), byte(listLen))
-		exts = append(exts, 0x00) // name_type = host_name
-		exts = append(exts, byte(len(name)>>8), byte(len(name)))
-		exts = append(exts, name...)
-	} else {
-		exts = append(exts, 0x00, 0x2b, 0x00, 0x02, 0x03, 0x04) // supported_versions
+	// Приманка идёт первой — либо вместо server_name, либо перед ним.
+	if !opt.serverName || opt.decoyFirst {
+		exts = append(exts, decoyExtension()...)
+	}
+	if opt.serverName {
+		exts = append(exts, serverNameExtension(sni)...)
 	}
 
 	body := make([]byte, 0, 2+32+1+4+2+2+len(exts))
@@ -66,6 +102,11 @@ func oversizedRecord() []byte {
 }
 
 func TestExtractSNI(t *testing.T) {
+	// Без server_name в списке остаётся только имя-подобная приманка "foo".
+	decoyOnly := clientHelloOpts("", helloOptions{})
+	// Приманка стоит до server_name: цикл обязан пропустить её и продолжить поиск.
+	decoyThenSNI := clientHelloOpts("example.com", helloOptions{serverName: true, decoyFirst: true})
+
 	tests := []struct {
 		name   string
 		in     []byte
@@ -78,7 +119,8 @@ func TestExtractSNI(t *testing.T) {
 		{"short record", []byte{0x16, 0x03, 0x03}, "", false},
 		{"application data", append([]byte{0x17}, clientHello("example.com")[1:]...), "", false},
 		{"record longer than buffer", oversizedRecord(), "", false},
-		{"no server_name extension", clientHelloWithSNI("example.com", false), "", false},
+		{"decoy extension only", decoyOnly, "", false},
+		{"decoy extension before server_name", decoyThenSNI, "example.com", true},
 	}
 
 	for _, tc := range tests {

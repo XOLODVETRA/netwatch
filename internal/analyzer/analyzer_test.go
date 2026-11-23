@@ -15,7 +15,9 @@ import (
 )
 
 func TestExtractHost(t *testing.T) {
-	longHost := "Host: " + strings.Repeat("a", 254) + "\r\n"
+	// Граница проходит по 253 байтам: 253 — валидно, 254 — уже нет.
+	host253 := strings.Repeat("a", 253)
+	host254 := strings.Repeat("a", 254)
 
 	tests := []struct {
 		name string
@@ -26,7 +28,8 @@ func TestExtractHost(t *testing.T) {
 		{"two spaces after colon", "Host:  example.org", "example.org"},
 		{"empty value", "Host:\r\n", ""},
 		{"no host header", "GET / HTTP/1.1\r\nUser-Agent: test\r\n\r\n", ""},
-		{"host longer than 253", longHost, ""},
+		{"host of 253 chars", "Host: " + host253 + "\r\n", host253},
+		{"host longer than 253", "Host: " + host254 + "\r\n", ""},
 	}
 
 	for _, tc := range tests {
@@ -145,6 +148,16 @@ func TestFlowKeyCanonical(t *testing.T) {
 	}
 	if fwd.Key != rev.Key {
 		t.Errorf("Key = %v и %v, ожидался канонический ключ", fwd.Key, rev.Key)
+	}
+
+	// Ключ канонический: A — всегда меньший endpoint, независимо от направления.
+	wantA := models.Endpoint{IP: netip.MustParseAddr("192.0.2.10"), Port: 51000}
+	wantB := models.Endpoint{IP: netip.MustParseAddr("198.51.100.20"), Port: 443}
+	if fwd.Key.A != wantA {
+		t.Errorf("Key.A = %v, want %v", fwd.Key.A, wantA)
+	}
+	if fwd.Key.B != wantB {
+		t.Errorf("Key.B = %v, want %v", fwd.Key.B, wantB)
 	}
 
 	if fwd.SrcIP == rev.SrcIP {
