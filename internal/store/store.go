@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	rateBuckets = 60            // по одной корзине на секунду
+	rateBuckets = 60               // по одной корзине на секунду
 	rateWindow  = 10 * time.Second // окно расчёта текущей скорости
 	maxAlerts   = 100
 )

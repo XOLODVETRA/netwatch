@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"net"
 	"net/netip"
-	"strings"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -82,7 +81,7 @@ func (a *Analyzer) parse(pkt gopacket.Packet) (models.Sample, bool) {
 	case "dns":
 		if msg, ok := decodeDNS(payload); ok {
 			if len(msg.Questions) > 0 {
-				domain = dnsName(msg.Questions[0].Name)
+				domain = string(msg.Questions[0].Name)
 			}
 			for _, ans := range msg.Answers {
 				if len(ans.IP) == 0 || len(ans.Name) == 0 {
@@ -90,7 +89,7 @@ func (a *Analyzer) parse(pkt gopacket.Packet) (models.Sample, bool) {
 				}
 				ip := toAddr(ans.IP)
 				if ip.IsValid() {
-					names = append(names, models.NameRecord{IP: ip, Name: dnsName(ans.Name)})
+					names = append(names, models.NameRecord{IP: ip, Name: string(ans.Name)})
 				}
 			}
 		}
@@ -207,9 +206,4 @@ func decodeDNS(payload []byte) (*layers.DNS, bool) {
 		return nil, false
 	}
 	return &msg, true
-}
-
-// dnsName приводит имя из wire-формата к обычному виду без завершающей точки.
-func dnsName(name []byte) string {
-	return strings.TrimSuffix(string(name), ".")
 }
