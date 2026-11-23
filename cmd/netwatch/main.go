@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"netwatch/internal/app"
-	"netwatch/internal/config"
-	"netwatch/internal/netutil"
+	"github.com/XOLODVETRA/netwatch/internal/app"
+	"github.com/XOLODVETRA/netwatch/internal/config"
+	"github.com/XOLODVETRA/netwatch/internal/netutil"
 )
 
 func main() {

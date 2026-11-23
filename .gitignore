@@ -1,6 +1,8 @@
 # Собранные бинарники
 netwatch.exe
 *.exe
+# сборка из README (Linux)
+/netwatch
 
 # Файлы редакторов
 .idea/

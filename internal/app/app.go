@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"netwatch/internal/analyzer"
-	"netwatch/internal/capture"
-	"netwatch/internal/config"
-	"netwatch/internal/netutil"
-	"netwatch/internal/render"
-	"netwatch/internal/store"
+	"github.com/XOLODVETRA/netwatch/internal/analyzer"
+	"github.com/XOLODVETRA/netwatch/internal/capture"
+	"github.com/XOLODVETRA/netwatch/internal/config"
+	"github.com/XOLODVETRA/netwatch/internal/netutil"
+	"github.com/XOLODVETRA/netwatch/internal/render"
+	"github.com/XOLODVETRA/netwatch/internal/store"
 )
 
 // Run запускает netwatch и возвращает управление после остановки.

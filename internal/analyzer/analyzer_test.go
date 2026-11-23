@@ -9,9 +9,9 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 
-	"netwatch/internal/config"
-	"netwatch/internal/models"
-	"netwatch/internal/store"
+	"github.com/XOLODVETRA/netwatch/internal/config"
+	"github.com/XOLODVETRA/netwatch/internal/models"
+	"github.com/XOLODVETRA/netwatch/internal/store"
 )
 
 func TestExtractHost(t *testing.T) {

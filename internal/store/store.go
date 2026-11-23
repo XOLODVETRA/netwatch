@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"netwatch/internal/config"
-	"netwatch/internal/models"
+	"github.com/XOLODVETRA/netwatch/internal/config"
+	"github.com/XOLODVETRA/netwatch/internal/models"
 )
 
 const (

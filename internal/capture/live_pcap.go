@@ -23,11 +23,11 @@ type LiveSource struct {
 func OpenLive(iface string, snaplen int32, promiscuous bool, filter string) (*LiveSource, error) {
 	handle, err := pcap.OpenLive(iface, snaplen, promiscuous, pcap.BlockForever)
 	if err != nil {
-		return nil, fmt.Errorf("открытие интерфейса %q: %w", iface, err)
+		return nil, fmt.Errorf("%w: интерфейс %q: %v", ErrNoPcap, iface, err)
 	}
 	if filter != "" {
 		if err := handle.SetBPFFilter(filter); err != nil {
-			_ = handle.Close()
+			handle.Close()
 			return nil, fmt.Errorf("BPF-фильтр %q: %w", filter, err)
 		}
 	}

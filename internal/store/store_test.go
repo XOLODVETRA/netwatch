@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"netwatch/internal/config"
-	"netwatch/internal/models"
+	"github.com/XOLODVETRA/netwatch/internal/config"
+	"github.com/XOLODVETRA/netwatch/internal/models"
 )
 
 // testKey — один и тот же поток во всех тестах.
@@ -147,4 +147,63 @@ func TestDomainsAndAppsCounted(t *testing.T) {
 	if !gotTLS {
 		t.Fatalf("Apps = %v, want запись tls", snap.Apps)
 	}
+}
+
+// TestHostDirectionsFollowingLocal фиксирует правило updateHosts.
+// С непустым списком локальных адресов при одном локальном конце
+// в таблицу попадает только удалённый, а его «исходящий» — трафик
+// от локальной машины; если локальных концов нет, источник считается
+// исходящим, а получатель — входящим.
+func TestHostDirectionsRelativeToLocal(t *testing.T) {
+	fixed := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
+	cfg := config.Default()
+	local := netip.MustParseAddr("192.0.2.10")
+	remote := netip.MustParseAddr("198.51.100.20")
+	key := testKey() // A = local:51000, B = remote:443
+
+	st := New(cfg, []netip.Addr{local}, WithClock(func() time.Time { return fixed }))
+	st.Ingest(sample(key, 100, "", "tls"))
+
+	hosts := hostsByIP(st.Snapshot(10, "test"))
+	if _, ok := hosts[local]; ok {
+		t.Fatalf("локальный адрес %s не должен попадать в таблицу хостов", local)
+	}
+	got, ok := hosts[remote]
+	if !ok {
+		t.Fatalf("удалённый хост %s отсутствует в таблице", remote)
+	}
+	if got.InBytes != 0 || got.OutBytes != 100 {
+		t.Fatalf("локальный источник: remote in/out = %d/%d, want 0/100", got.InBytes, got.OutBytes)
+	}
+
+	// Обратное направление: удалённый источник, локальный получатель.
+	back := sample(key, 50, "", "tls")
+	back.SrcIP, back.DstIP = remote, local
+	st.Ingest(back)
+
+	got = hostsByIP(st.Snapshot(10, "test"))[remote]
+	if got.InBytes != 50 || got.OutBytes != 100 {
+		t.Fatalf("после обратного пакета: remote in/out = %d/%d, want 50/100", got.InBytes, got.OutBytes)
+	}
+
+	// Ни один конец не локальный: источник — исходящий, получатель — входящий.
+	st = New(cfg, []netip.Addr{netip.MustParseAddr("203.0.113.9")}, WithClock(func() time.Time { return fixed }))
+	st.Ingest(sample(key, 100, "", "tls"))
+
+	hosts = hostsByIP(st.Snapshot(10, "test"))
+	a, b := hosts[local], hosts[remote]
+	if a.InBytes != 0 || a.OutBytes != 100 {
+		t.Fatalf("без локальных концов: источник in/out = %d/%d, want 0/100", a.InBytes, a.OutBytes)
+	}
+	if b.InBytes != 100 || b.OutBytes != 0 {
+		t.Fatalf("без локальных концов: получатель in/out = %d/%d, want 100/0", b.InBytes, b.OutBytes)
+	}
+}
+
+func hostsByIP(snap models.Snapshot) map[netip.Addr]models.HostView {
+	out := make(map[netip.Addr]models.HostView, len(snap.TopHosts))
+	for _, h := range snap.TopHosts {
+		out[h.IP] = h
+	}
+	return out
 }

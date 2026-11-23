@@ -9,7 +9,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"netwatch/internal/models"
+	"github.com/XOLODVETRA/netwatch/internal/models"
 )
 
 const (

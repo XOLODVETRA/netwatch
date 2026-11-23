@@ -1,4 +1,4 @@
-module netwatch
+module github.com/XOLODVETRA/netwatch
 
 go 1.27.1
 
