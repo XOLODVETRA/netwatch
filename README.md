@@ -122,15 +122,15 @@ go test ./...
 ```
 
 ```text
-?   	netwatch/cmd/netwatch	[no test files]
-ok  	netwatch/internal/analyzer	0.025s
-?   	netwatch/internal/app	[no test files]
-?   	netwatch/internal/capture	[no test files]
-ok  	netwatch/internal/config	0.024s
-?   	netwatch/internal/models	[no test files]
-?   	netwatch/internal/netutil	[no test files]
-?   	netwatch/internal/render	[no test files]
-ok  	netwatch/internal/store	0.024s
+?   	github.com/XOLODVETRA/netwatch/cmd/netwatch	[no test files]
+ok  	github.com/XOLODVETRA/netwatch/internal/analyzer	0.025s
+?   	github.com/XOLODVETRA/netwatch/internal/app	[no test files]
+?   	github.com/XOLODVETRA/netwatch/internal/capture	[no test files]
+ok  	github.com/XOLODVETRA/netwatch/internal/config	0.017s
+?   	github.com/XOLODVETRA/netwatch/internal/models	[no test files]
+?   	github.com/XOLODVETRA/netwatch/internal/netutil	[no test files]
+?   	github.com/XOLODVETRA/netwatch/internal/render	[no test files]
+ok  	github.com/XOLODVETRA/netwatch/internal/store	0.014s
 ```
 
 Покрыто: разбор HTTP `Host` (включая отбрасывание имён длиннее 253 символов), разбор TLS SNI (валидный ClientHello и обрезанные/чужие буферы), канонизация ключа потока, `Default`/`Validate` конфига, агрегация пакетов в поток и счётчики доменов/сервисов, удаление потока после `flow_ttl` в `Prune`. DNS-разбор и детекторы алертов юнит-тестами не покрыты; DNS виден на демо-pcap, а алерты там не срабатывают — потоки слишком малы для порогов.
