@@ -149,11 +149,11 @@ func TestDomainsAndAppsCounted(t *testing.T) {
 	}
 }
 
-// TestHostDirectionsFollowingLocal фиксирует правило updateHosts.
+// TestHostDirectionsRelativeToLocal фиксирует правило updateHosts.
 // С непустым списком локальных адресов при одном локальном конце
 // в таблицу попадает только удалённый, а его «исходящий» — трафик
-// от локальной машины; если локальных концов нет, источник считается
-// исходящим, а получатель — входящим.
+// от локальной машины; если локальных концов нет или оба локальные,
+// источник считается исходящим, а получатель — входящим.
 func TestHostDirectionsRelativeToLocal(t *testing.T) {
 	fixed := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
 	cfg := config.Default()
@@ -197,6 +197,20 @@ func TestHostDirectionsRelativeToLocal(t *testing.T) {
 	}
 	if b.InBytes != 100 || b.OutBytes != 0 {
 		t.Fatalf("без локальных концов: получатель in/out = %d/%d, want 100/0", b.InBytes, b.OutBytes)
+	}
+
+	// Оба конца локальные: источник — исходящий, получатель — входящий,
+	// в таблице оба.
+	st = New(cfg, []netip.Addr{local, remote}, WithClock(func() time.Time { return fixed }))
+	st.Ingest(sample(key, 100, "", "tls"))
+
+	hosts = hostsByIP(st.Snapshot(10, "test"))
+	a, b = hosts[local], hosts[remote]
+	if a.InBytes != 0 || a.OutBytes != 100 {
+		t.Fatalf("оба конца локальные: источник in/out = %d/%d, want 0/100", a.InBytes, a.OutBytes)
+	}
+	if b.InBytes != 100 || b.OutBytes != 0 {
+		t.Fatalf("оба конца локальные: получатель in/out = %d/%d, want 100/0", b.InBytes, b.OutBytes)
 	}
 }
 

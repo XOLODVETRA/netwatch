@@ -15,7 +15,7 @@ type LiveSource struct{}
 
 // OpenLive всегда возвращает ErrNoPcap.
 func OpenLive(string, int32, bool, string) (*LiveSource, error) {
-	return nil, fmt.Errorf("%w: сборка без тега pcap (Linux: libpcap-dev + gcc, Windows: Npcap SDK + gcc)", ErrNoPcap)
+	return nil, fmt.Errorf("%w: сборка без тега pcap (Linux: libpcap-dev + gcc, Windows: Npcap)", ErrNoPcap)
 }
 
 func (s *LiveSource) NextPacket() (gopacket.Packet, error) { return nil, ErrNoPcap }

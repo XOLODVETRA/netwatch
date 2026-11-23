@@ -4,7 +4,8 @@
 //
 //	go build -tags pcap ./cmd/netwatch
 //
-// Linux: нужны libpcap-dev и gcc. Windows: Npcap SDK и gcc (например, из MSYS2).
+// Linux: нужны libpcap-dev и gcc. Windows: достаточно Npcap (runtime),
+// gopacket вызывает wpcap.dll напрямую.
 package capture
 
 import (
@@ -23,7 +24,7 @@ type LiveSource struct {
 func OpenLive(iface string, snaplen int32, promiscuous bool, filter string) (*LiveSource, error) {
 	handle, err := pcap.OpenLive(iface, snaplen, promiscuous, pcap.BlockForever)
 	if err != nil {
-		return nil, fmt.Errorf("%w: интерфейс %q: %v", ErrNoPcap, iface, err)
+		return nil, fmt.Errorf("открытие интерфейса %q: %w", iface, err)
 	}
 	if filter != "" {
 		if err := handle.SetBPFFilter(filter); err != nil {
